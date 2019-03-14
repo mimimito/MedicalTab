@@ -34,12 +34,13 @@ namespace Fluffy
 
             #region Methods
 
-            public static implicit operator DiseaseProgress(Hediff hediff)
+            public static explicit operator DiseaseProgress(Hediff hediff)
             {
-                var comp = hediff.TryGetComp<HediffComp_Immunizable>();
-                if (comp == null)
+                var immunizable = hediff.TryGetComp<HediffComp_Immunizable>();
+                if (immunizable == null)
                     throw new NullReferenceException($"hediff does not have immunizable comp");
-
+                var tendable = hediff.TryGetComp<HediffComp_TendDuration>();
+                
                 //int tillTendTicks = -1;
                 //var tendComp = hediff.TryGetComp<HediffComp_TendDuration>();
                 //if (tendComp != null)
@@ -48,9 +49,10 @@ namespace Fluffy
                 return new DiseaseProgress
                 {
                     label = hediff.Label,
-                    immunity = comp.Immunity,
+                    immunity = immunizable.Immunity,
                     severity = hediff.Severity,
-                    tended = !hediff.TendableNow()
+                    tended = !hediff.TendableNow(),
+                    tillTendTicks = tendable?.tendTicksLeft ?? 0
                 };
             }
 
@@ -145,7 +147,7 @@ namespace Fluffy
 
                 if ( tags.Count == 0 )
                 {
-                    Log.Warning( $"Medical Tab :: Capacity {capacityDef.defName} does not have any bodyPartTags associated with it." );
+                    Log.Warning( $"Medical Tab :: Capacity {capacityDef.defName} does not have any bodyPartTags associated with it. This may be intentional." );
                 }
                 CapacityTags.Add(capacityDef, tags);
             }
@@ -165,7 +167,7 @@ namespace Fluffy
 
                 if ( !used )
                 {
-                    Log.Warning( $"Medical Tab :: Tag {tag.defName} is not associated with any pawnCapacity." );
+                    Log.Warning( $"Medical Tab :: Tag {tag.defName} is not associated with any pawnCapacity. This may be intentional." );
                 }
             }
         }
@@ -175,7 +177,7 @@ namespace Fluffy
         #region Methods
 
 
-        public static List<DiseaseProgress> GetDiseaseProgresses( this Pawn pawn)
+        public static List<Hediff> GetDiseases( this Pawn pawn)
         {
             return pawn.health.hediffSet.hediffs
                 .Where(
@@ -183,7 +185,6 @@ namespace Fluffy
                         h.Visible && h.def.lethalSeverity > 0 &&
                         h.def.PossibleToDevelopImmunityNaturally() &&
                         h.TryGetComp<HediffComp_Immunizable>() != null)
-                .Select(h => (DiseaseProgress)h)
                 .ToList();
         }
 
@@ -193,7 +194,7 @@ namespace Fluffy
                 pawn.health.summaryHealth.SummaryHealthPercent < 1f ||
                 pawn.health.hediffSet.BleedRateTotal > 0f ||
                 pawn.health.hediffSet.PainTotal > 0f ||
-                pawn.GetDiseaseProgresses().Any() ||
+                pawn.GetDiseases().Any() ||
                 DefDatabase<PawnCapacityDef>.AllDefsListForReading
                     .Any( cap => pawn.health.capacities.GetLevel( cap ) < 1f ) )
                 return false;
